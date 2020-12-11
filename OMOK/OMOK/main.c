@@ -28,7 +28,7 @@ bool IsThreeThree(int x, int y);
 bool IsFourFour(int x, int y);
 bool IsSix(int x, int y);
 
-void gotoxy(int x, int y);	// (0, 0) ~ (79, 24)
+void gotoxy(int x, int y);	// (0, 0) ~ (79, 24 )
 void IntroGame();
 void SetWall();
 void DrawField();
