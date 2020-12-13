@@ -2,469 +2,577 @@
 #include <stdbool.h>
 #include <conio.h>
 #include <windows.h>
+#include "direction.h"
 
-#define WIN 5
+#define FIVE_STONE 5
 #define MAX_X_COORD 17
 #define MAX_Y_COORD 17
-
 #define WALL -1
 #define EMPTY 0
 #define BLACK 1
 #define WHITE 2
+#define SPACE 32
+#define LEFT 75
+#define RIGHT 77
+#define UP 72
+#define DOWN 80
+#define ESC 27
 
-#define SPACE	32
-#define LEFT	75
-#define RIGHT	77
-#define UP		72
-#define DOWN	80
-#define ESC		27
-
-int  IsWin(int x, int y, int stone);
-int  ConsiderStone(int stone, int isFive);
-
+void SearchThreeThree(int x, int y, int directionX, int directionY, int* const isTwiceThreeThree, int* const isOverlap, int k);
+void SearchFourFour(int x, int y, int directionX, int directionY, int* const isTwiceFourFour);
+void ShowWarning(const char* const warnStr);
+void ShowGameOver(int myStoneColor);
+void ShowGameIntro();
+void ShowBoard();
+void SetBoardWall();
+void GetKeyInput();
+void GoToXY(int x, int y);
+bool IsMoreThanFiveStone(int myStoneColor, int numOfMyStones);
+bool IsWin(int x, int y, int myStoneColor);
 bool IsEmpty(int x, int y);
 bool IsForbidden(int x, int y);
 bool IsThreeThree(int x, int y);
 bool IsFourFour(int x, int y);
 bool IsSix(int x, int y);
+int  ChangeTurn(int myStoneColor);
 
-void gotoxy(int x, int y);	// (0, 0) ~ (79, 24 )
-void IntroGame();
-void SetWall();
-void DrawField();
-void GetKey();
-void Warning(char* warnStr);
-void SearchThreeThree(int x, int y, int xSign, int ySign, int* isTwiceThreeThree, int* isOverlap, int k);
-void SearchFourFour(int x, int y, int xSign, int ySign, int* isTwiceFourFour);
-
-int field[MAX_X_COORD][MAX_Y_COORD] = { 0 };
-int(*pf)[MAX_Y_COORD] = field;
+int board[MAX_X_COORD][MAX_Y_COORD] = { 0 };
+int(*board_ptr)[MAX_X_COORD] = board;
+int NumOfDirection = sizeof(searching_Win_Dir) / sizeof(searching_Win_Dir[0]);
 
 int main()
 {
-	char key = 0;
-	while (tolower(key) != ESC)
+	char keyInput = 0;
+
+	while (keyInput != ESC)
 	{
 		system("cls");
-		memset(&field, 0, sizeof(field));
+		memset(&board, 0, sizeof(board));
+		ShowGameIntro();
+		SetBoardWall();
+		ShowBoard();
+		GetKeyInput();
 
-		IntroGame();
-		SetWall();
-		DrawField();
-		GetKey();
-
-		puts("Continue:	Press C");
-		puts("Stop:		Press ESC");
-
-		key = _getch();
-		while ((tolower(key) != ESC) && (tolower(key) != 'c'))
+		do
 		{
-			key = _getch();
-		}
+			keyInput = _getch();
+		} while ((keyInput != ESC) && (tolower(keyInput) != 'c'));
 	}
+
 	return 0;
 }
 
-void IntroGame()
+void ShowGameIntro()
 {
-	for (int i = 0; i < 5; i++, Sleep(250))
+	for (int i = 0; i < 5; i++, Sleep(200))
 		printf("♪ ");
-	puts("");
-	puts("Omok version 2.7.3");
-	puts("개발일자: 2020-09-01");
-	printf("\n규칙\n");
-	puts("흑돌이 선 입니다.");
-	puts("렌주룰에 따라, 흑돌은 33, 44, 6목이 금수입니다.");
-	puts("다만, 흑은 오목을 만들 때는 모든 금수를 무시합니다.");
-	puts("백돌은 아무런 제약이 없습니다.");
-	printf("\n조작법\n");
-	puts("방향키:		이동");
-	puts("스페이스바 :	착점");
-	printf("\n인지하셨다면 키보드를 누르세요\n");
+
+	printf("\n\n__Rule__\n");
+	puts("Black stone first.");
+	puts("As renju rule, black stone is forbidden to have 33, 44, 6 stones.");
+	puts("But black stone can ignore those rule when making 5 stones.");
+	puts("White stones don't have any restrictions.");
+	printf("\n\n__Manual__\n");
+	puts("Arrow keys: move");
+	puts("space bar : put stone");
+	printf("\nIf you recognize it, press the keyboard.\n");
 	_getch();
 	system("cls");
 }
 
-void gotoxy(int x, int y)
+void GoToXY(int x, int y)
 {
-	COORD pos = { x, y };
+	COORD pos = { x * 2, y };
 	SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), pos);
 }
 
-void DrawField()
+void ShowBoard()
 {
+	int x;
+
 	for (int i = 0; i < MAX_X_COORD; i++)
 	{
-		int k = 0;
+		x = 0;
+
 		for (int j = 0; j < MAX_Y_COORD; j++)
 		{
-			gotoxy(k, i);
-			k += 2;
+			GoToXY(x, i);
+			x += 1;
 
-			if (pf[j][i] == EMPTY)
+			if (board_ptr[j][i] == EMPTY)
+			{
 				printf("┼");
+			}
 
-			else if (pf[j][i] == BLACK)
+			else if (board_ptr[j][i] == BLACK)
+			{
 				printf("○");
+			}
 
-			else if (pf[j][i] == WHITE)
+			else if (board_ptr[j][i] == WHITE)
+			{
 				printf("●");
+			}
 
-			else if (pf[j][i] == WALL)
+			else if (board_ptr[j][i] == WALL)
+			{
 				printf(" ");
+			}
 		}
 	}
-	gotoxy(2, 1);
+
+	GoToXY(1, 1);
 }
 
 bool IsEmpty(int x, int y)
 {
-	if (pf[x][y] == EMPTY)
+	if (board_ptr[x][y] == EMPTY)
+	{
 		return true;
+	}
 
 	else
 	{
-		Warning("Not Empty");
+		ShowWarning("Not Empty");
+
 		return false;
 	}
 }
 
-void GetKey()
+void GetKeyInput()
 {
-	char key = 0;
-	int stone = BLACK;
-	int screenX = 2, screenY = 1;
-	int myFieldX = 1, myFieldY = 1;
+	char keyInput = 0;
+	int myStoneColor = BLACK;
+	int screenCursorX = 1, screenCursorY = 1;
 
 	while (1)
 	{
 		if (_kbhit())
 		{
-			key = _getch();
-			switch (key)
+			keyInput = _getch();
+
+			switch (keyInput)
 			{
 			case UP:
-				if (myFieldY == 1)
+			{
+				if (screenCursorY == 1)
+				{
 					break;
-				gotoxy(screenX, screenY--);		gotoxy(screenX, screenY);
-				myFieldY--;
+				}
+
+				GoToXY(screenCursorX, --screenCursorY);
 				break;
+			}
 
 			case LEFT:
-				if (myFieldX == 1)
+			{
+				if (screenCursorX == 1)
+				{
 					break;
-				gotoxy(screenX -= 2, screenY);	gotoxy(screenX, screenY);
-				myFieldX--;
+				}
+
+				GoToXY(--screenCursorX, screenCursorY);
 				break;
+			}
 
 			case DOWN:
-				if (myFieldY == MAX_Y_COORD - 2)
+			{
+				if (screenCursorY == MAX_Y_COORD - 2)
+				{
 					break;
-				gotoxy(screenX, screenY++);		gotoxy(screenX, screenY);
-				myFieldY++;
+				}
+
+				GoToXY(screenCursorX, ++screenCursorY);
 				break;
+			}
 
 			case RIGHT:
-				if (myFieldX == MAX_X_COORD - 2)
+			{
+				if (screenCursorX == MAX_X_COORD - 2)
+				{
 					break;
-				gotoxy(screenX += 2, screenY);	gotoxy(screenX, screenY);
-				myFieldX++;
+				}
+
+				GoToXY(++screenCursorX, screenCursorY);
 				break;
+			}
 
 			case SPACE:
-				if (IsEmpty(myFieldX, myFieldY))
+			{
+				if (IsEmpty(screenCursorX, screenCursorY) == false)
 				{
-					if (IsWin(myFieldX, myFieldY, stone))
+					GoToXY(screenCursorX, screenCursorY);
+				}
+
+				else
+				{
+					if (IsWin(screenCursorX, screenCursorY, myStoneColor) == true)
 					{
-						pf[myFieldX][myFieldY] = stone;
-						DrawField();
-						gotoxy(0, 16);
-						printf("%s WIN \n", stone == BLACK ? "BLACK ○" : "WHITE ●");
+						board_ptr[screenCursorX][screenCursorY] = myStoneColor;
+
+						ShowBoard();
+						ShowGameOver(myStoneColor);
+
 						return;
 					}
 
-					else if (stone == BLACK)
+					else if (myStoneColor == BLACK)
 					{
-						if (IsForbidden(myFieldX, myFieldY))
+						if (IsForbidden(screenCursorX, screenCursorY))
 						{
-							gotoxy(screenX, screenY);
+							GoToXY(screenCursorX, screenCursorY);
 							break;
 						}
-						pf[myFieldX][myFieldY] = BLACK;
+
+						board_ptr[screenCursorX][screenCursorY] = BLACK;
 					}
 
 					else
-						pf[myFieldX][myFieldY] = WHITE;
+					{
+						board_ptr[screenCursorX][screenCursorY] = WHITE;
+					}
 
-					DrawField();
-					gotoxy(screenX, screenY);
-
-					if (stone == BLACK)
-						stone = WHITE;
-					else
-						stone = BLACK;
+					ShowBoard();
+					GoToXY(screenCursorX, screenCursorY);
+					myStoneColor = ChangeTurn(myStoneColor);
 				}
-				gotoxy(screenX, screenY);
+			}
+
+			default:
+				break;
 			}
 		}
 	}
 }
-int ConsiderStone(int stone, int isFive)
+
+bool IsMoreThanFiveStone(int myStoneColor, int numOfMyStones)
 {
-	if (stone == WHITE)
+	if (myStoneColor == WHITE)
 	{
-		if (isFive >= WIN)
-			return 1;
+		if (numOfMyStones >= FIVE_STONE)
+		{
+			return true;
+		}
 	}
+
 	else
-		if (isFive == WIN)
-			return 1;
-	return 0;
+	{
+		if (numOfMyStones == FIVE_STONE)
+		{
+			return true;
+		}
+	}
+
+	return false;
 }
 
-int IsWin(int x, int y, int stone)
+bool IsWin(int x, int y, int myStoneColor)
 {
 	int i;
-	int isFive;
+	int numOfMyStones;
 
-	for (i = 1, isFive = 1; pf[x + i][y] == stone; i++, isFive++);		// →
-	for (i = 1; pf[x - i][y] == stone; i++, isFive++);					// ←
-	if (ConsiderStone(stone, isFive))
-		return 1;
+	for (int j = 0; j < NumOfDirection; j++)
+	{
+		for (i = 1, numOfMyStones = 1;
+			board_ptr[x + (i * (searching_Win_Dir[j][0][0])) * searching_Win_Dir[j][0][1]][y + (i * (searching_Win_Dir[j][0][2])) * searching_Win_Dir[j][0][3]] == myStoneColor;
+			i++, numOfMyStones++);
 
-	for (i = 1, isFive = 1; pf[x][y - i] == stone; i++, isFive++);		//↑
-	for (i = 1; pf[x][y + i] == stone; i++, isFive++);					//↓
-	if (ConsiderStone(stone, isFive))
-		return 1;
+		for (i = 1;
+			board_ptr[x + (i * (searching_Win_Dir[j][1][0])) * searching_Win_Dir[j][1][1]][y + (i * (searching_Win_Dir[j][1][2])) * searching_Win_Dir[j][1][3]] == myStoneColor;
+			i++, numOfMyStones++);
 
-	for (i = 1, isFive = 1;pf[x - i][y - i] == stone; i++, isFive++);	//↖
-	for (i = 1; pf[x + i][y + i] == stone; i++, isFive++);				//↘
-	if (ConsiderStone(stone, isFive))
-		return 1;
+		if (IsMoreThanFiveStone(myStoneColor, numOfMyStones) == true)
+		{
+			return true;
+		}
+	}
 
-	for (i = 1, isFive = 1; pf[x - i][y + i] == stone; i++, isFive++);	//↙
-	for (i = 1; pf[x + i][y - i] == stone; i++, isFive++);				//↗
-	if (ConsiderStone(stone, isFive))
-		return 1;
-
-	return 0;
+	return false;
 }
 
 bool IsForbidden(int x, int y)
 {
 	if (IsThreeThree(x, y) || IsFourFour(x, y) || IsSix(x, y))
+	{
 		return true;
+	}
+
 	else
+	{
 		return false;
+	}
 }
 
 bool IsThreeThree(int x, int y)
 {
-	int isTwiceThreeThree = 0;
+	int countThreeThree = 0;
 	int isOverlap[8] = { 0 };
-	SearchThreeThree(x, y, 0, -1, &isTwiceThreeThree, isOverlap, 0);	// ↑
-	SearchThreeThree(x, y, 0, 1, &isTwiceThreeThree, isOverlap, 1);	// ↓	
-	SearchThreeThree(x, y, 1, 0, &isTwiceThreeThree, isOverlap, 2);	// →
-	SearchThreeThree(x, y, -1, 0, &isTwiceThreeThree, isOverlap, 3);	// ←
-	SearchThreeThree(x, y, -1, -1, &isTwiceThreeThree, isOverlap, 4);	// ↖
-	SearchThreeThree(x, y, 1, 1, &isTwiceThreeThree, isOverlap, 5);	// ↘
-	SearchThreeThree(x, y, 1, -1, &isTwiceThreeThree, isOverlap, 6);	// ↗
-	SearchThreeThree(x, y, -1, 1, &isTwiceThreeThree, isOverlap, 7);	// ↙
 
-	if (isTwiceThreeThree >= 2)
+	for (int i = 0; i < 8; i++)
 	{
-		Warning("3-3");
-		return true;
+		SearchThreeThree(x, y, searching_ThreeThree_Dir[i][0], searching_ThreeThree_Dir[i][1], &countThreeThree, isOverlap, i);
+
+		if (countThreeThree >= 2)
+		{
+			ShowWarning("3-3");
+
+			return true;
+		}
 	}
-	else
-		return false;
+
+	return false;
 }
 
-void SearchThreeThree(int x, int y, int xSign, int ySign, int* isTwiceThreeThree, int* isOverlap, int k)
+void SearchThreeThree(int x, int y, int directionX, int directionY, int* const countThreeThree, int* const isOverlap, int k)
 {
 	if (isOverlap[k] == 1)
+	{
 		return;
+	}
 
 	int i;
 	int countBlack = 0;
 
-	if (pf[x + (xSign * (-1))][y + (ySign * (-1))] == BLACK)
+	if (board_ptr[x + (directionX * (-1))][y + (directionY * (-1))] == BLACK)
 	{
-		if (pf[x + (xSign * (-2))][y + (ySign * (-2))] == EMPTY)
+		if (board_ptr[x + (directionX * (-2))][y + (directionY * (-2))] == EMPTY)
 		{
-			if (pf[x + (xSign * 1)][y + (ySign * 1)] == BLACK)
+			if (board_ptr[x + (directionX * 1)][y + (directionY * 1)] == BLACK)
 			{
-				if (pf[x + (xSign * 2)][y + (ySign * 2)] == EMPTY)
+				if (board_ptr[x + (directionX * 2)][y + (directionY * 2)] == EMPTY)
 				{
 					countBlack = 3;
 					isOverlap[k + 1] = 1;
 				}
 			}
-			else if (pf[x + (xSign * 1)][y + (ySign * 1)] == EMPTY)
-			{
-				if (pf[x + (xSign * 2)][y + (ySign * 2)] == BLACK)
-					if (pf[x + (xSign * 3)][y + (ySign * 3)] == EMPTY)
-						countBlack = 3;
-			}
-		}
-	}
 
-	else if (pf[x + (xSign * (-1))][y + (ySign * (-1))] == EMPTY)
-	{
-		if (pf[x + (xSign * 1)][y + (ySign * 1)] == BLACK)
-		{
-			for (i = 2, countBlack = 2; i < 4; i++)
+			else if (board_ptr[x + (directionX * 1)][y + (directionY * 1)] == EMPTY)
 			{
-				if (pf[x + (xSign * i)][y + (ySign * i)] == BLACK)
+				if (board_ptr[x + (directionX * 2)][y + (directionY * 2)] == BLACK)
 				{
-					if (pf[x + (xSign * (i + 1))][y + (ySign * (i + 1))] != EMPTY)
-						break;
-
-					else
-						countBlack++;
+					if (board_ptr[x + (directionX * 3)][y + (directionY * 3)] == EMPTY)
+					{
+						countBlack = 3;
+					}
 				}
 			}
 		}
-		else if (pf[x + (xSign * 1)][y + (ySign * 1)] == EMPTY)
+	}
+
+	else if (board_ptr[x + (directionX * (-1))][y + (directionY * (-1))] == EMPTY)
+	{
+		if (board_ptr[x + (directionX * 1)][y + (directionY * 1)] == BLACK)
 		{
-			for (i = 2, countBlack = 1; i < 4; i++)
+			for (i = 2, countBlack = 2; i < 4; i++)
 			{
-				if (pf[x + (xSign * i)][y + (ySign * i)] != BLACK)
-					break;
-				else
-					countBlack++;
-				if (i == 3)
-					if (pf[x + (xSign * (i + 1))][y + (ySign * (i + 1))] != EMPTY)
-						return;
+				if (board_ptr[x + (directionX * i)][y + (directionY * i)] == BLACK)
+				{
+					if (board_ptr[x + (directionX * (i + 1))][y + (directionY * (i + 1))] != EMPTY)
+					{
+						break;
+					}
+
+					else
+					{
+						countBlack++;
+					}
+				}
 			}
 		}
 
+		else if (board_ptr[x + (directionX * 1)][y + (directionY * 1)] == EMPTY)
+		{
+			for (i = 2, countBlack = 1; i < 4; i++)
+			{
+				if (board_ptr[x + (directionX * i)][y + (directionY * i)] != BLACK)
+				{
+					break;
+				}
+
+				else
+				{
+					countBlack++;
+				}
+
+				if (i == 3)
+				{
+					if (board_ptr[x + (directionX * (i + 1))][y + (directionY * (i + 1))] != EMPTY)
+					{
+						return;
+					}
+				}
+			}
+		}
 	}
 
 	isOverlap[k] = 1;
+
 	if (countBlack == 3)
-		(*isTwiceThreeThree)++;
+	{
+		(*countThreeThree)++;
+	}
 }
 
 bool IsFourFour(int x, int y)
 {
-	int isTwiceFourFour = 0;
-	SearchFourFour(x, y, 0, -1, &isTwiceFourFour);	// ↑
-	SearchFourFour(x, y, 1, -1, &isTwiceFourFour);	// ↗
-	SearchFourFour(x, y, 1, 0, &isTwiceFourFour);	// →
-	SearchFourFour(x, y, 1, 1, &isTwiceFourFour);	// ↘
-	SearchFourFour(x, y, 0, 1, &isTwiceFourFour);	// ↓
-	SearchFourFour(x, y, -1, 1, &isTwiceFourFour);	// ↙
-	SearchFourFour(x, y, -1, 0, &isTwiceFourFour);	// ←
-	SearchFourFour(x, y, -1, -1, &isTwiceFourFour);	// ↖
+	int countFourFour = 0;
 
-	if (isTwiceFourFour >= 2)
+	for (int i = 0; i < 8; i++)
 	{
-		Warning("4-4");
-		return true;
+		SearchFourFour(x, y, searching_FourFour_Dir[i][0], searching_FourFour_Dir[i][1], &countFourFour);
+
+		if (countFourFour >= 2)
+		{
+			ShowWarning("4-4");
+
+			return true;
+		}
 	}
-	else
-		return false;
+
+	return false;
 }
 
-void SearchFourFour(int x, int y, int xSign, int ySign, int* isTwiceFourFour)
+void SearchFourFour(int x, int y, int directionX, int directionY, int* const countFourFour)
 {
 	int i;
 	int countBlack = 0;
 
-	if (pf[x + (xSign * (-1))][y + (ySign * (-1))] == BLACK)
+	if (board_ptr[x + (directionX * (-1))][y + (directionY * (-1))] == BLACK)
 	{
-		if (pf[x + (xSign * (-2))][y + (ySign * (-2))] == WHITE || pf[x + (xSign * (-2))][y + (ySign * (-2))] == WALL)
-			if (pf[x + (xSign * (1))][y + (ySign * (1))] == BLACK)
-				if (pf[x + (xSign * (2))][y + (ySign * (2))] == BLACK)
-					if (pf[x + (xSign * (3))][y + (ySign * (3))] == WHITE || pf[x + (xSign * (3))][y + (ySign * (3))] == WALL)
+		if (board_ptr[x + (directionX * (-2))][y + (directionY * (-2))] == WHITE || board_ptr[x + (directionX * (-2))][y + (directionY * (-2))] == WALL)
+		{
+			if (board_ptr[x + (directionX * (1))][y + (directionY * (1))] == BLACK)
+			{
+				if (board_ptr[x + (directionX * (2))][y + (directionY * (2))] == BLACK)
+				{
+					if (board_ptr[x + (directionX * (3))][y + (directionY * (3))] == WHITE || board_ptr[x + (directionX * (3))][y + (directionY * (3))] == WALL)
+					{
 						return;
+					}
+				}
+			}
+		}
 
 		for (i = 1, countBlack = 2; i < 4; i++)
 		{
-			if (pf[x + (xSign * i)][y + (ySign * i)] == BLACK)
+			if (board_ptr[x + (directionX * i)][y + (directionY * i)] == BLACK)
+			{
 				countBlack++;
-			else if (pf[x + (xSign * i)][y + (ySign * i)] == WHITE || pf[x + (xSign * i)][y + (ySign * i)] == WALL)
+			}
+
+			else if (board_ptr[x + (directionX * i)][y + (directionY * i)] == WHITE || board_ptr[x + (directionX * i)][y + (directionY * i)] == WALL)
+			{
 				break;
+			}
 		}
 	}
 
 	else
 	{
-		if (pf[x + (xSign * (-1))][y + (ySign * (-1))] == WHITE || pf[x + (xSign * (-1))][y + (ySign * (-1))] == WALL)
-			if (pf[x + (xSign * (1))][y + (ySign * (1))] == BLACK)
-				if (pf[x + (xSign * (2))][y + (ySign * (2))] == BLACK)
-					if (pf[x + (xSign * (3))][y + (ySign * (3))] == BLACK)
-						if (pf[x + (xSign * (4))][y + (ySign * (4))] == WHITE || pf[x + (xSign * (4))][y + (ySign * (4))] == WALL)
+		if (board_ptr[x + (directionX * (-1))][y + (directionY * (-1))] == WHITE || board_ptr[x + (directionX * (-1))][y + (directionY * (-1))] == WALL)
+		{
+			if (board_ptr[x + (directionX * (1))][y + (directionY * (1))] == BLACK)
+			{
+				if (board_ptr[x + (directionX * (2))][y + (directionY * (2))] == BLACK)
+				{
+					if (board_ptr[x + (directionX * (3))][y + (directionY * (3))] == BLACK)
+					{
+						if (board_ptr[x + (directionX * (4))][y + (directionY * (4))] == WHITE || board_ptr[x + (directionX * (4))][y + (directionY * (4))] == WALL)
+						{
 							return;
+						}
+					}
+				}
+			}
+		}
 
 		for (i = 1, countBlack = 1; i < 5; i++)
 		{
-			if (pf[x + (xSign * i)][y + (ySign * i)] == BLACK)
+			if (board_ptr[x + (directionX * i)][y + (directionY * i)] == BLACK)
+			{
 				countBlack++;
-			else if (pf[x + (xSign * i)][y + (ySign * i)] == WHITE || pf[x + (xSign * i)][y + (ySign * i)] == WALL)
+			}
+
+			else if (board_ptr[x + (directionX * i)][y + (directionY * i)] == WHITE || board_ptr[x + (directionX * i)][y + (directionY * i)] == WALL)
+			{
 				break;
+			}
 		}
 	}
+
 	if (countBlack == 4)
-		(*isTwiceFourFour)++;
+	{
+		(*countFourFour)++;
+	}
 }
 
 bool IsSix(int x, int y)
 {
 	int i;
-	int stone = BLACK;
-	int isSix = 0;
-	for (i = 1, isSix = 1; pf[x + i][y] == stone; i++, isSix++);		// →
-	for (i = 1; pf[x - i][y] == stone; i++, isSix++);					// ←
-	if (isSix >= 6)
-		goto WARN;
+	int myStoneColor = BLACK;
+	int numOfMyStones = 0;
 
-	for (i = 1, isSix = 1; pf[x][y - i] == stone; i++, isSix++);		//↑
-	for (i = 1; pf[x][y + i] == stone; i++, isSix++);					//↓
-	if (isSix >= 6)
-		goto WARN;
+	for (int j = 0; j < NumOfDirection; j++)
+	{
+		for (i = 1, numOfMyStones = 1;
+			board_ptr[x + (i * (searching_Win_Dir[j][0][0])) * searching_Win_Dir[j][0][1]][y + (i * (searching_Win_Dir[j][0][2])) * searching_Win_Dir[j][0][3]] == myStoneColor;
+			i++, numOfMyStones++);
 
-	for (i = 1, isSix = 1;pf[x - i][y - i] == stone; i++, isSix++);		//↖
-	for (i = 1; pf[x + i][y + i] == stone; i++, isSix++);				//↘
-	if (isSix >= 6)
-		goto WARN;
+		for (i = 1;
+			board_ptr[x + (i * (searching_Win_Dir[j][1][0])) * searching_Win_Dir[j][1][1]][y + (i * (searching_Win_Dir[j][1][2])) * searching_Win_Dir[j][1][3]] == myStoneColor;
+			i++, numOfMyStones++);
 
-	for (i = 1, isSix = 1; pf[x - i][y + i] == stone; i++, isSix++);	//↙
-	for (i = 1; pf[x + i][y - i] == stone; i++, isSix++);				//↗
-	if (isSix >= 6)
-		goto WARN;
+		if (numOfMyStones >= 6)
+		{
+			ShowWarning("6 Stone");
+
+			return true;
+		}
+	}
 
 	return false;
-
-WARN:
-	Warning("6 stone");
-	return true;
 }
 
-void Warning(char* warnStr)
+void ShowWarning(const char* const warnStr)
 {
 	Beep(600, 200);
-	gotoxy(33, 1);
+	GoToXY(17, 1);
 	puts(warnStr);
-	Sleep(500);
+	Sleep(300);
 	system("cls");
-	DrawField();
+	ShowBoard();
 }
 
-void SetWall()
+void ShowGameOver(int myStoneColor)
+{
+	GoToXY(0, 16);
+	printf("%s WIN \n", myStoneColor == BLACK ? "BLACK ○" : "WHITE ●");
+	puts("Continue: Press C");
+	puts("Stop:     Press ESC");
+}
+
+int ChangeTurn(int myStoneColor)
+{
+	if (myStoneColor == BLACK)
+	{
+		return WHITE;
+	}
+
+	else
+	{
+		return BLACK;
+	}
+}
+
+void SetBoardWall()
 {
 	int i;
 
 	for (i = 0; i < MAX_X_COORD; i++)
-		pf[i][0] = WALL;
-
-	for (i = 0; i < MAX_Y_COORD - 1; i++)
 	{
-		pf[0][i] = WALL;
-		pf[MAX_X_COORD - 1][i] = WALL;
+		board_ptr[i][0] = WALL;
+		board_ptr[i][MAX_Y_COORD - 1] = WALL;
+		board_ptr[0][i] = WALL;
+		board_ptr[MAX_X_COORD - 1][i] = WALL;
 	}
-
-	for (i = 0; i < MAX_X_COORD; i++)
-		pf[i][MAX_Y_COORD - 1] = WALL;
 }
