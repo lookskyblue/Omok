@@ -1,6 +1,10 @@
 Omock Game
 =============================
 
+# Rule
+<img width="100%" src="https://user-images.githubusercontent.com/71778475/124382017-54f4cd00-dd00-11eb-83e5-41fc54ca7951.PNG"/>
+
+***
 # Make 5stone
  <img width="100%" src="https://user-images.githubusercontent.com/71778475/124381646-7b196d80-dcfe-11eb-931d-93416ea07b8f.gif"/>
 
@@ -20,10 +24,14 @@ Omock Game
 ***
 > ## Description
 > 1. I made it based on a window console.
-> 2. Unless you run into an obstacle(long box), your score(Elapsed Time) will continue to rise.
-> 3. Ceated date: 2021-02-07
+> 2. I tried to implement the Renju rules as much as I could.
+> 3. This code may be a little messy.
+> 4. Ceated date: 2020-12-11
 
 ***
 > ## How To Play
+> > #### SpaceBar : Drop a stone
+> > #### Arrow ↓ : Move Down
+> > #### Arrow ↑ : Move Up
 > > #### Arrow → : Move Right
 > > #### Arrow ← : Move Left
